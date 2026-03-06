@@ -1,13 +1,15 @@
-FROM oven/bun:1 AS base
+FROM oven/bun:1 AS deps
 WORKDIR /app
-
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
+FROM oven/bun:1
+WORKDIR /app
+COPY --from=deps /app/node_modules node_modules
+COPY package.json config.yaml tsconfig.json ./
 COPY src/ src/
-COPY config.yaml tsconfig.json ./
 
 ENV NODE_ENV=production
-EXPOSE ${BRIDGE_WS_PORT:-8765}
+EXPOSE 8765
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["bun", "src/index.ts"]
