@@ -1,0 +1,19 @@
+servers:
+  - grief
+  - anarchy
+  - lobby
+  - builder
+  - velocity
+
+llm:
+  priority: ["groq", "openai"]
+  max_tokens: 1024
+  providers:
+    groq:
+      model: "llama-3.3-70b-versatile"
+    openai:
+      model: "gpt-4o-mini"
+
+access:
+  admins: [6150166606]
+  moderators: []
