@@ -12,8 +12,11 @@ const bridge = new BridgeServer(wsPort, env.BRIDGE_SECRET);
 const bot = createBot(env.TELEGRAM_BOT_TOKEN, config, llm, bridge);
 
 bridge.start();
+
+await bot.api.deleteWebhook({ drop_pending_updates: true });
 bot.start({
   onStart: (info) => console.log(`[bot] @${info.username} started`),
+  drop_pending_updates: true,
 });
 
 const shutdown = () => {
