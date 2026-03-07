@@ -22,15 +22,15 @@ export class BridgeServer {
     this.server = Bun.serve<WsData>({
       port: this.port,
       fetch(req, server) {
-        const url = new URL(req.url);
-        if (url.pathname === "/health" || url.pathname === "/") {
-          return new Response("OK", { status: 200 });
+        if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
+          const upgraded = server.upgrade(req, { data: { authenticated: false } });
+          if (!upgraded) {
+            return new Response("WebSocket upgrade failed", { status: 400 });
+          }
+          return;
         }
 
-        const upgraded = server.upgrade(req, { data: { authenticated: false } });
-        if (!upgraded) {
-          return new Response("WebSocket upgrade expected", { status: 426 });
-        }
+        return new Response("OK", { status: 200 });
       },
       websocket: {
         open: (ws) => {
