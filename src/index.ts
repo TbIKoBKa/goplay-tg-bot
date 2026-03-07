@@ -7,7 +7,8 @@ const env = loadEnv();
 const config = loadConfig();
 
 const llm = new LLMManager(config.llm, env);
-const bridge = new BridgeServer(env.BRIDGE_WS_PORT, env.BRIDGE_SECRET);
+const wsPort = env.PORT ?? env.BRIDGE_WS_PORT;
+const bridge = new BridgeServer(wsPort, env.BRIDGE_SECRET);
 const bot = createBot(env.TELEGRAM_BOT_TOKEN, config, llm, bridge);
 
 bridge.start();

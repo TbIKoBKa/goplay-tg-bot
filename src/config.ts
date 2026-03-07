@@ -28,6 +28,7 @@ const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   BRIDGE_SECRET: z.string().min(1, "BRIDGE_SECRET is required"),
   BRIDGE_WS_PORT: z.coerce.number().int().positive().default(8765),
+  PORT: z.coerce.number().int().positive().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
