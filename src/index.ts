@@ -13,11 +13,29 @@ const bot = createBot(env.TELEGRAM_BOT_TOKEN, config, llm, bridge);
 
 bridge.start();
 
-await bot.api.deleteWebhook({ drop_pending_updates: true });
-bot.start({
-  onStart: (info) => console.log(`[bot] @${info.username} started`),
-  drop_pending_updates: true,
-});
+async function startBot(): Promise<void> {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await bot.api.deleteWebhook({ drop_pending_updates: true });
+      await bot.start({
+        onStart: (info) => console.log(`[bot] @${info.username} started`),
+        drop_pending_updates: true,
+      });
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("409") && attempt < 5) {
+        console.log(`[bot] conflict 409, retry ${attempt}/5 in ${attempt * 3}s...`);
+        await Bun.sleep(attempt * 3000);
+        continue;
+      }
+      console.error(`[bot] failed to start: ${msg}`);
+      throw err;
+    }
+  }
+}
+
+startBot();
 
 const shutdown = () => {
   console.log("[shutdown] stopping...");
