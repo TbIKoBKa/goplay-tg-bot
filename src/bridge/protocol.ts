@@ -3,6 +3,7 @@ import { z } from "zod";
 export const BridgeAuthSchema = z.object({
   type: z.literal("auth"),
   secret: z.string(),
+  role: z.enum(["bridge", "api"]).default("bridge"),
 });
 
 export const BridgeRequestSchema = z.object({

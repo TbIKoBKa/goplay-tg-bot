@@ -1,7 +1,8 @@
 import type { Server, ServerWebSocket } from "bun";
 import { parseBridgeMessage, type BridgeRequest, type BridgeResponse } from "./protocol";
 
-type WsData = { authenticated: boolean };
+type ClientRole = "bridge" | "api";
+type WsData = { authenticated: boolean; role: ClientRole | null };
 
 type PendingRequest = {
   resolve: (res: BridgeResponse) => void;
@@ -10,7 +11,8 @@ type PendingRequest = {
 
 export class BridgeServer {
   private server: Server<WsData> | null = null;
-  private client: ServerWebSocket<WsData> | null = null;
+  private bridge: ServerWebSocket<WsData> | null = null;
+  private apiClients = new Set<ServerWebSocket<WsData>>();
   private pending = new Map<string, PendingRequest>();
 
   constructor(
@@ -23,7 +25,7 @@ export class BridgeServer {
       port: this.port,
       fetch(req, server) {
         if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
-          const upgraded = server.upgrade(req, { data: { authenticated: false } });
+          const upgraded = server.upgrade(req, { data: { authenticated: false, role: null } });
           if (!upgraded) {
             return new Response("WebSocket upgrade failed", { status: 400 });
           }
@@ -41,10 +43,11 @@ export class BridgeServer {
           this.handleMessage(ws, text);
         },
         close: (ws) => {
-          if (this.client === ws) {
-            this.client = null;
-            console.log("[bridge] client disconnected");
+          if (this.bridge === ws) {
+            this.bridge = null;
+            console.log("[bridge] bridge client disconnected");
           }
+          this.apiClients.delete(ws);
         },
       },
     });
@@ -57,18 +60,20 @@ export class BridgeServer {
       req.resolve({ type: "response", id, success: false, message: "Bridge shutting down" });
     }
     this.pending.clear();
-    this.client?.close();
+    this.bridge?.close();
+    for (const ws of this.apiClients) ws.close();
+    this.apiClients.clear();
     this.server?.stop();
     console.log("[bridge] stopped");
   }
 
   get connected(): boolean {
-    return this.client !== null;
+    return this.bridge !== null;
   }
 
   execute(server: string, command: string, timeoutMs = 10_000): Promise<BridgeResponse> {
     return new Promise((resolve) => {
-      if (!this.client) {
+      if (!this.bridge) {
         resolve({ type: "response", id: "", success: false, message: "Bridge not connected" });
         return;
       }
@@ -82,23 +87,36 @@ export class BridgeServer {
       }, timeoutMs);
 
       this.pending.set(id, { resolve, timer });
-      this.client.send(JSON.stringify(request));
+      this.bridge.send(JSON.stringify(request));
     });
   }
 
   private handleMessage(ws: ServerWebSocket<WsData>, text: string): void {
     const msg = parseBridgeMessage(text);
-    if (!msg) return;
+    if (!msg) {
+      console.warn("[bridge] failed to parse message:", text.slice(0, 200));
+      return;
+    }
 
     if (msg.type === "auth") {
-      if (msg.secret === this.secret) {
-        ws.data.authenticated = true;
-        this.client = ws;
-        console.log("[bridge] client authenticated");
-      } else {
+      if (msg.secret !== this.secret) {
         console.warn("[bridge] auth failed, closing");
         ws.close(1008, "Invalid secret");
+        return;
       }
+
+      ws.data.authenticated = true;
+      ws.data.role = msg.role;
+
+      if (msg.role === "bridge") {
+        this.bridge = ws;
+        console.log("[bridge] bridge client authenticated");
+      } else {
+        this.apiClients.add(ws);
+        console.log("[bridge] api client authenticated");
+      }
+
+      ws.send(JSON.stringify({ type: "auth", success: true }));
       return;
     }
 
@@ -107,13 +125,54 @@ export class BridgeServer {
       return;
     }
 
-    if (msg.type === "response") {
+    if (msg.type === "response" && ws.data.role === "bridge") {
       const pending = this.pending.get(msg.id);
       if (pending) {
         clearTimeout(pending.timer);
         this.pending.delete(msg.id);
         pending.resolve(msg);
       }
+      return;
     }
+
+    if (msg.type === "request" && ws.data.role === "api") {
+      console.log(`[bridge] forwarding api request ${msg.id} -> ${msg.server}: ${msg.command}`);
+      this.forwardApiRequest(ws, msg);
+      return;
+    }
+
+    console.warn(`[bridge] unhandled message type=${msg.type} role=${ws.data.role}`);
+  }
+
+  private forwardApiRequest(sender: ServerWebSocket<WsData>, req: BridgeRequest): void {
+    console.log(`[bridge] bridge connected: ${this.bridge !== null}`);
+    if (!this.bridge) {
+      sender.send(JSON.stringify({
+        type: "response",
+        id: req.id,
+        success: false,
+        message: "Bridge not connected",
+      }));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.pending.delete(req.id);
+      sender.send(JSON.stringify({
+        type: "response",
+        id: req.id,
+        success: false,
+        message: "Request timed out",
+      }));
+    }, 10_000);
+
+    this.pending.set(req.id, {
+      resolve: (res) => {
+        sender.send(JSON.stringify(res));
+      },
+      timer,
+    });
+
+    this.bridge.send(JSON.stringify(req));
   }
 }
