@@ -15,7 +15,9 @@
 ## 2. Подписка на уведомления (готово на стороне бота)
 
 - `/subscribe` / `/unsubscribe` — игрок включает/выключает уведомления; chat-id хранятся в `SUBSCRIBERS_FILE`.
-  В Docker это `/data/subscribers.json` на volume — без `-v goplay-tg-subs:/data` список теряется при редеплое.
+  В Docker это `/data/subscribers.json`. Чтобы список пережил редеплой, нужен постоянный диск на `/data`:
+  на Railway — **Volume с mount path `/data`** (директива `VOLUME` в Dockerfile там запрещена и ломает сборку),
+  локально — `-v goplay-tg-subs:/data`. Без диска бот работает, но подписчики сбрасываются при каждом деплое.
 - Рассылка: `POST {BRIDGE публичный порт}/notify` с заголовком `x-notify-secret: $NOTIFY_SECRET`
   и телом `{"text":"<HTML-текст>"}` → бот шлёт текст всем подписчикам.
 - Включается только если задан `NOTIFY_SECRET`.

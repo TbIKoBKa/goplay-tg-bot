@@ -9,13 +9,13 @@ COPY --from=deps /app/node_modules node_modules
 COPY package.json config.yaml tsconfig.json ./
 COPY src/ src/
 
-# Подписчики переживают редеплой только на volume — /app перезаписывается образом.
-RUN mkdir -p /data && chown -R bun:bun /data
-VOLUME /data
-ENV SUBSCRIBERS_FILE=/data/subscribers.json
-
 ENV NODE_ENV=production
 EXPOSE 8765
-USER bun
+
+# Подписчики переживают редеплой только на постоянном диске: /app заменяется образом.
+# Диск подключается в дашборде Railway (Volume, mount path /data) — объявлять его
+# директивой в Dockerfile там запрещено, сборка падает. Без диска путь всё равно рабочий,
+# просто список сбрасывается при деплое; директорию SubscriberStore создаёт сам.
+ENV SUBSCRIBERS_FILE=/data/subscribers.json
 
 CMD ["bun", "src/index.ts"]
