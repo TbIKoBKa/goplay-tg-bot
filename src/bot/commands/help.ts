@@ -1,38 +1,57 @@
 import { Composer, type Context } from "grammy";
+import type { AuthMiddleware } from "../middleware/auth";
 
-const HELP_TEXT = `\u2139\ufe0f <b>GoPlay Bot \u2014 \u043a\u043e\u043c\u0430\u043d\u0434\u044b</b>
+const PUBLIC_HELP = `ℹ️ <b>GoPlay Bot</b>
 
-<b>\u0411\u0430\u043d\u044b / \u043c\u0443\u0442\u044b / \u043a\u0438\u043a\u0438</b> (\u043c\u043e\u0434\u0435\u0440\u0430\u0442\u043e\u0440+)
-/ban &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; [\u043f\u0440\u0438\u0447\u0438\u043d\u0430]
-/unban &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt;
-/tempban &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; &lt;\u0432\u0440\u0435\u043c\u044f&gt; [\u043f\u0440\u0438\u0447\u0438\u043d\u0430]
-/mute &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; [\u043f\u0440\u0438\u0447\u0438\u043d\u0430]
-/unmute &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt;
-/tempmute &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; &lt;\u0432\u0440\u0435\u043c\u044f&gt; [\u043f\u0440\u0438\u0447\u0438\u043d\u0430]
-/kick &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; [\u043f\u0440\u0438\u0447\u0438\u043d\u0430]
+🔔 /subscribe — подписаться на уведомления о ивентах (айрдропы, сезоны Battle Pass)
+🔕 /unsubscribe — отключить уведомления
+🔗 /link &lt;код&gt; — привязать игровой аккаунт (код получи в игре командой <b>/link</b> или на сайте)
 
-<b>\u0418\u0433\u0440\u043e\u043a\u0438</b> (\u043c\u043e\u0434\u0435\u0440\u0430\u0442\u043e\u0440+)
-/op &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt;
-/deop &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt;
+<b>AI-ассистент</b>
+Напиши вопрос о сервере прямо сюда, в личку. В общем чате — тегни бота или ответь на его сообщение.
 
-<b>\u0421\u0435\u0440\u0432\u0435\u0440</b>
-/list &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; \u2014 \u043e\u043d\u043b\u0430\u0439\u043d (\u043c\u043e\u0434\u0435\u0440\u0430\u0442\u043e\u0440+)
-/say &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; &lt;\u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435&gt; \u2014 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u0432 \u0447\u0430\u0442 (\u043c\u043e\u0434\u0435\u0440\u0430\u0442\u043e\u0440+)
-/reload &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; [\u043f\u043b\u0430\u0433\u0438\u043d] \u2014 \u043f\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0430 (\u0430\u0434\u043c\u0438\u043d)
-/maintenance &lt;on|off&gt; \u2014 \u0440\u0435\u0436\u0438\u043c \u043e\u0431\u0441\u043b\u0443\u0436\u0438\u0432\u0430\u043d\u0438\u044f (\u0430\u0434\u043c\u0438\u043d)
-/send &lt;\u043d\u0438\u043a&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; \u2014 \u043f\u0435\u0440\u0435\u043c\u0435\u0441\u0442\u0438\u0442\u044c \u0438\u0433\u0440\u043e\u043a\u0430 (\u0430\u0434\u043c\u0438\u043d)
-/whitelist &lt;on|off|add|remove&gt; &lt;\u0441\u0435\u0440\u0432\u0435\u0440&gt; [\u043d\u0438\u043a] \u2014 \u0432\u0430\u0439\u0442\u043b\u0438\u0441\u0442 (\u0430\u0434\u043c\u0438\u043d)
+🌐 Сайт: go-play.gg
+💬 Discord: discord.gg/hnwGEFEXzN`;
 
-<b>AI-\u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043d\u0442</b>
-\u0422\u0435\u0433\u043d\u0438\u0442\u0435 \u0431\u043e\u0442\u0430 \u0438\u043b\u0438 \u043e\u0442\u0432\u0435\u0442\u044c\u0442\u0435 \u043d\u0430 \u0435\u0433\u043e \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u0441 \u0432\u043e\u043f\u0440\u043e\u0441\u043e\u043c \u043e \u043f\u043b\u0430\u0433\u0438\u043d\u0430\u0445 \u0438 \u043a\u043e\u043c\u0430\u043d\u0434\u0430\u0445.
+const STAFF_HELP = `ℹ️ <b>GoPlay Bot — команды стаффа</b>
 
-<b>\u0421\u0435\u0440\u0432\u0435\u0440\u044b:</b> lobby, grief, anarchy, builder, velocity`;
+<b>Баны / муты / кики</b> (модератор+)
+/ban &lt;ник&gt; &lt;сервер&gt; [причина]
+/unban &lt;ник&gt; &lt;сервер&gt;
+/tempban &lt;ник&gt; &lt;сервер&gt; &lt;время&gt; [причина]
+/mute &lt;ник&gt; &lt;сервер&gt; [время] [причина]
+/tempmute &lt;ник&gt; &lt;сервер&gt; &lt;время&gt; [причина]
+/unmute &lt;ник&gt; &lt;сервер&gt;
+/kick &lt;ник&gt; &lt;сервер&gt; [причина]
 
-export function helpCommand(): Composer<Context> {
+<b>Сервер</b>
+/list &lt;сервер&gt; — онлайн (модератор+)
+/say &lt;сервер&gt; &lt;сообщение&gt; — сообщение в чат (модератор+)
+/send &lt;ник&gt; &lt;сервер&gt; — переместить игрока (админ)
+/reload &lt;сервер&gt; [плагин] — перезагрузка (админ)
+/maintenance &lt;on|off&gt; — режим тех. работ (админ)
+/whitelist &lt;on|off|add|remove|list&gt; &lt;сервер&gt; [ник] — вайтлист (админ)
+
+<b>Игроки</b> (админ)
+/op &lt;ник&gt; &lt;сервер&gt;
+/deop &lt;ник&gt; &lt;сервер&gt;
+/gm &lt;ник&gt; &lt;режим&gt; &lt;сервер&gt;
+/tp &lt;ник&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt; &lt;сервер&gt;
+
+<b>Время</b>: 30m, 2h, 7d, 1w. <b>Сервер</b> <code>all</code> — все игровые сразу.
+
+<b>AI-ассистент</b>
+Тегните бота, ответьте на его сообщение или просто напишите в личку.`;
+
+export function helpCommand(auth: AuthMiddleware): Composer<Context> {
   const composer = new Composer<Context>();
 
-  composer.command(["help", "start"], async (ctx) => {
-    await ctx.reply(HELP_TEXT, { parse_mode: "HTML" });
+  composer.command("help", async (ctx) => {
+    const isStaff = auth.roleOf(ctx.from?.id) !== null;
+    await ctx.reply(isStaff ? STAFF_HELP : PUBLIC_HELP, {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    });
   });
 
   return composer;

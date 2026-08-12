@@ -14,10 +14,12 @@ const ConfigSchema = z.object({
     max_tokens: z.number().int().positive().default(1024),
     providers: z.record(z.string(), LLMProviderConfigSchema),
   }),
-  access: z.object({
-    admins: z.array(z.number()),
-    moderators: z.array(z.number()),
-  }),
+  access: z
+    .object({
+      admins: z.array(z.number()).default([]),
+      moderators: z.array(z.number()).default([]),
+    })
+    .default({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -29,6 +31,13 @@ const EnvSchema = z.object({
   BRIDGE_SECRET: z.string().min(1, "BRIDGE_SECRET is required"),
   BRIDGE_WS_PORT: z.coerce.number().int().positive().default(8765),
   PORT: z.coerce.number().int().positive().optional(),
+  // Привязка игрового аккаунта: бот шлёт код на бэкенд сайта (go-play-be).
+  WEBSITE_API_URL: z.string().url().optional(),
+  WEBSITE_API_TOKEN: z.string().optional(),
+  // Рассылка уведомлений о ивентах: POST /notify на публичный порт бриджа.
+  NOTIFY_SECRET: z.string().optional(),
+  // Файл-хранилище подписчиков на уведомления.
+  SUBSCRIBERS_FILE: z.string().default("subscribers.json"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

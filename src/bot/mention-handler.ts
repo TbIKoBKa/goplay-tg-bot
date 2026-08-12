@@ -1,19 +1,29 @@
 import type { Context, NextFunction } from "grammy";
 import type { BotContext } from "./index";
 import { buildSystemPrompt } from "../knowledge/prompt";
+import { markdownToHtml, truncate } from "./format";
+import { RateLimiter } from "./rate-limit";
+import { replyTo } from "./reply";
 
 const systemPrompt = buildSystemPrompt();
 
-async function sendWithFallback(
-  ctx: Context,
-  text: string,
-  messageId: number,
-): Promise<void> {
-  const replyOpts = { reply_to_message_id: messageId } as const;
+/** Каждый вызов — запрос к LLM, поэтому ограничиваем частоту и длину. */
+const ASK_LIMIT = new RateLimiter(3, 60_000);
+const MAX_QUESTION_LENGTH = 1000;
+
+/** Чтобы один пользователь не запускал несколько параллельных запросов. */
+const inFlight = new Set<number>();
+
+async function sendAnswer(ctx: Context, text: string): Promise<void> {
+  const trimmed = truncate(text);
   try {
-    await ctx.reply(text, { ...replyOpts, parse_mode: "Markdown" });
-  } catch {
-    await ctx.reply(text, replyOpts);
+    await replyTo(ctx, markdownToHtml(trimmed), {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    });
+  } catch (err) {
+    console.error("[ai] HTML reply failed, falling back to plain text:", err);
+    await replyTo(ctx, trimmed);
   }
 }
 
@@ -22,6 +32,12 @@ export function createMentionHandler(ctx: BotContext) {
     const message = grammyCtx.message;
     if (!message?.text) return next();
 
+    // Команда, не подошедшая ни одному обработчику, — это опечатка, а не вопрос к AI.
+    const startsWithCommand = message.entities?.some(
+      (e) => e.type === "bot_command" && e.offset === 0,
+    );
+    if (startsWithCommand) return next();
+
     const botInfo = grammyCtx.me;
     const botUsername = botInfo.username;
 
@@ -29,15 +45,16 @@ export function createMentionHandler(ctx: BotContext) {
       message.entities?.some(
         (e) =>
           e.type === "mention" &&
-          message.text!
-            .slice(e.offset, e.offset + e.length)
+          message
+            .text!.slice(e.offset, e.offset + e.length)
             .toLowerCase() === `@${botUsername.toLowerCase()}`,
       ) ?? false;
 
-    const isReply =
-      message.reply_to_message?.from?.id === botInfo.id;
+    const isReply = message.reply_to_message?.from?.id === botInfo.id;
+    // В личке отвечаем на любой текст: обращаться там больше не к кому.
+    const isPrivate = grammyCtx.chat?.type === "private";
 
-    if (!isMentioned && !isReply) return next();
+    if (!isMentioned && !isReply && !isPrivate) return next();
 
     let userText = message.text;
     if (isMentioned) {
@@ -45,16 +62,30 @@ export function createMentionHandler(ctx: BotContext) {
     }
 
     if (!userText) {
-      await grammyCtx.reply("\u0417\u0430\u0434\u0430\u0439\u0442\u0435 \u0432\u043e\u043f\u0440\u043e\u0441 \u043f\u043e\u0441\u043b\u0435 \u0443\u043f\u043e\u043c\u0438\u043d\u0430\u043d\u0438\u044f \u0431\u043e\u0442\u0430.", {
-        reply_to_message_id: message.message_id,
-      });
+      await replyTo(grammyCtx, "Задайте вопрос после упоминания бота.");
       return;
     }
 
-    await grammyCtx.replyWithChatAction("typing");
+    const userId = grammyCtx.from?.id;
+    if (userId === undefined) return;
 
-    const answer = await ctx.llm.chat(systemPrompt, userText);
+    if (inFlight.has(userId)) {
+      await replyTo(grammyCtx, "⏳ Ещё думаю над прошлым вопросом, подожди секунду.");
+      return;
+    }
+    if (!ASK_LIMIT.try(String(userId))) {
+      const seconds = Math.ceil(ASK_LIMIT.retryAfterMs(String(userId)) / 1000);
+      await replyTo(grammyCtx, `⏱ Слишком часто. Попробуй через ${seconds} с.`);
+      return;
+    }
 
-    await sendWithFallback(grammyCtx, answer, message.message_id);
+    inFlight.add(userId);
+    try {
+      await grammyCtx.replyWithChatAction("typing");
+      const answer = await ctx.llm.chat(systemPrompt, userText.slice(0, MAX_QUESTION_LENGTH));
+      await sendAnswer(grammyCtx, answer);
+    } finally {
+      inFlight.delete(userId);
+    }
   };
 }

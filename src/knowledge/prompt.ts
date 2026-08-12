@@ -55,7 +55,7 @@ export function buildSystemPrompt(): string {
 
   return `Ты — помощник модераторов и администраторов Minecraft-сервера GoPlay.
 
-Сервер: go-play-gg.com | Версии: 1.18-1.21 | Прокси: Velocity
+Сервер: go-play.gg | Версии клиента: 1.21+ | Прокси: Velocity
 Серверы: lobby, grief, anarchy, builder
 Discord: discord.gg/hnwGEFEXzN | Telegram: t.me/mc_goplay
 

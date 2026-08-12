@@ -1,30 +1,36 @@
 import { Composer, type Context } from "grammy";
 import type { BotContext } from "../index";
 import type { AuthMiddleware } from "../middleware/auth";
-import { parseArgs, validateServer, invalidServer, missingArgs, executeOnServer } from "./utils";
+import { parseCommand } from "./args";
+import { executeOnServer } from "./utils";
+import { replyTo } from "../reply";
 
-const VALID_ACTIONS = new Set(["on", "off", "add", "remove", "list"]);
+const ACTIONS = ["on", "off", "add", "remove", "list"] as const;
+const USAGE = "/whitelist <on|off|add|remove|list> <сервер> [ник]";
 
 export function whitelistCommand(ctx: BotContext, auth: AuthMiddleware): Composer<Context> {
   const composer = new Composer();
 
-  composer.use(auth.require("admin")).command("whitelist", async (grammyCtx) => {
-    const args = parseArgs(grammyCtx.match as string);
-    if (args.length < 2) return missingArgs(grammyCtx, "/whitelist <on|off|add|remove|list> <сервер> [ник]");
-
-    const [action, server, nick] = args;
-    if (!VALID_ACTIONS.has(action!)) {
-      await grammyCtx.reply("\u274c Действие: on, off, add, remove, list");
-      return;
-    }
-    if (!validateServer(server!)) return invalidServer(grammyCtx);
+  composer.command("whitelist", auth.require("admin"), async (g) => {
+    const parsed = await parseCommand(
+      g,
+      USAGE,
+      [
+        { kind: "word", oneOf: ACTIONS },
+        { kind: "server" },
+        { kind: "nick", optional: true },
+      ],
+      ctx.servers,
+    );
+    if (!parsed) return;
+    const [action = "", server = "", nick = ""] = parsed;
 
     if ((action === "add" || action === "remove") && !nick) {
-      return missingArgs(grammyCtx, `/whitelist ${action} <сервер> <ник>`);
+      await replyTo(g, `Использование: /whitelist ${action} <сервер> <ник>`);
+      return;
     }
 
-    const cmd = nick ? `whitelist ${action} ${nick}` : `whitelist ${action}`;
-    await executeOnServer(grammyCtx, ctx, server!, cmd);
+    await executeOnServer(g, ctx, server, nick ? `whitelist ${action} ${nick}` : `whitelist ${action}`);
   });
 
   return composer;

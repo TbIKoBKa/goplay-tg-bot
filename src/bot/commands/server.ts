@@ -1,64 +1,77 @@
 import { Composer, type Context } from "grammy";
 import type { BotContext } from "../index";
 import type { AuthMiddleware } from "../middleware/auth";
-import { parseArgs, validateServer, invalidServer, missingArgs, executeOnServer } from "./utils";
+import { parseCommand } from "./args";
+import { executeOnServer } from "./utils";
+import { replyTo } from "../reply";
 
 export function serverCommands(ctx: BotContext, auth: AuthMiddleware): Composer<Context> {
   const composer = new Composer();
 
-  composer.use(auth.require("mod")).command("list", async (grammyCtx) => {
-    const args = parseArgs(grammyCtx.match as string);
-    if (args.length < 1) return missingArgs(grammyCtx, "/list <сервер>");
+  composer.command("list", auth.require("mod"), async (g) => {
+    const parsed = await parseCommand(g, "/list <сервер>", [{ kind: "server" }], ctx.servers);
+    if (!parsed) return;
+    const [server = ""] = parsed;
 
-    const [server] = args;
-    if (!validateServer(server!)) return invalidServer(grammyCtx);
-
-    await executeOnServer(grammyCtx, ctx, server!, "list");
+    await executeOnServer(g, ctx, server, "list");
   });
 
-  composer.use(auth.require("mod")).command("say", async (grammyCtx) => {
-    const args = parseArgs(grammyCtx.match as string);
-    if (args.length < 2) return missingArgs(grammyCtx, "/say <сервер> <сообщение>");
+  composer.command("say", auth.require("mod"), async (g) => {
+    const parsed = await parseCommand(
+      g,
+      "/say <сервер> <сообщение>",
+      [{ kind: "server" }, { kind: "rest" }],
+      ctx.servers,
+    );
+    if (!parsed) return;
+    const [server = "", message = ""] = parsed;
 
-    const [server, ...messageParts] = args;
-    if (!validateServer(server!)) return invalidServer(grammyCtx);
-
-    const message = messageParts.join(" ");
-    await executeOnServer(grammyCtx, ctx, server!, `say ${message}`);
+    await executeOnServer(g, ctx, server, `say ${message}`);
   });
 
-  composer.use(auth.require("admin")).command("reload", async (grammyCtx) => {
-    const args = parseArgs(grammyCtx.match as string);
-    if (args.length < 1) return missingArgs(grammyCtx, "/reload <сервер> [плагин]");
+  composer.command("reload", auth.require("admin"), async (g) => {
+    const parsed = await parseCommand(
+      g,
+      "/reload <сервер> [плагин]",
+      [{ kind: "server" }, { kind: "word", optional: true }],
+      ctx.servers,
+    );
+    if (!parsed) return;
+    const [server = "", plugin = ""] = parsed;
 
-    const [server, plugin] = args;
-    if (!validateServer(server!)) return invalidServer(grammyCtx);
-
-    const cmd = plugin ? `plugman reload ${plugin}` : "plugman reload all";
-    await executeOnServer(grammyCtx, ctx, server!, cmd);
+    await executeOnServer(g, ctx, server, plugin ? `plugman reload ${plugin}` : "plugman reload all");
   });
 
-  composer.use(auth.require("admin")).command("maintenance", async (grammyCtx) => {
-    const args = parseArgs(grammyCtx.match as string);
-    if (args.length < 1) return missingArgs(grammyCtx, "/maintenance <on|off>");
+  composer.command("maintenance", auth.require("admin"), async (g) => {
+    const parsed = await parseCommand(
+      g,
+      "/maintenance <on|off>",
+      [{ kind: "word", oneOf: ["on", "off"] }],
+      ctx.servers,
+    );
+    if (!parsed) return;
+    const [action = ""] = parsed;
 
-    const [action] = args;
-    if (action !== "on" && action !== "off") {
-      await grammyCtx.reply("\u274c Используйте: /maintenance on или /maintenance off");
+    await executeOnServer(g, ctx, "velocity", `maintenance ${action}`);
+  });
+
+  composer.command("send", auth.require("admin"), async (g) => {
+    const parsed = await parseCommand(
+      g,
+      "/send <ник> <сервер>",
+      [{ kind: "nick" }, { kind: "server" }],
+      ctx.servers,
+    );
+    if (!parsed) return;
+    const [nick = "", server = ""] = parsed;
+
+    // Команду выполняет сам прокси, поэтому цель не может быть прокси или "all".
+    if (server === "velocity" || server === "all") {
+      await replyTo(g, "❌ Укажите конкретный игровой сервер, а не velocity/all.");
       return;
     }
 
-    await executeOnServer(grammyCtx, ctx, "velocity", `maintenance ${action}`);
-  });
-
-  composer.use(auth.require("admin")).command("send", async (grammyCtx) => {
-    const args = parseArgs(grammyCtx.match as string);
-    if (args.length < 2) return missingArgs(grammyCtx, "/send <ник> <сервер>");
-
-    const [nick, server] = args;
-    if (!validateServer(server!)) return invalidServer(grammyCtx);
-
-    await executeOnServer(grammyCtx, ctx, "velocity", `send ${nick} ${server}`);
+    await executeOnServer(g, ctx, "velocity", `send ${nick} ${server}`);
   });
 
   return composer;
