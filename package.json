@@ -1,6 +1,6 @@
 {
   "name": "goplay-tg-bot",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "grammy": "^1.35.0",
-    "openai": "^4.85.0",
     "yaml": "^2.7.0",
     "zod": "^3.24.0"
   },

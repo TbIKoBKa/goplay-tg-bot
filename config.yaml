@@ -1,19 +1,28 @@
+# Игровые режимы, которые бот показывает игрокам.
+# id обязан совпадать с именем сервера в velocity.toml: по нему прокси ищет,
+# у кого спрашивать онлайн.
 servers:
+  - id: grief
+    title: "Гриф"
+    hint: "Анархо-гриф: рейды, приваты, PvP"
+  - id: vanilla
+    title: "Ванилла"
+    hint: "Классическое выживание с защитой от грифа"
+  - id: stolby
+    title: "Столбы"
+    hint: "Батл-рояль: каждый на своём столбе"
+
+# Где установлен плагин GoPlayTelegram. Бот не знает, на каком режиме игрок
+# набрал /tg, поэтому код привязки предъявляется всем серверам из этого списка.
+link_servers:
   - grief
-  - anarchy
+  - vanilla
+  - stolby
   - lobby
-  - builder
-  - velocity
 
-llm:
-  priority: ["groq", "openai"]
-  max_tokens: 1024
-  providers:
-    groq:
-      model: "llama-3.3-70b-versatile"
-    openai:
-      model: "gpt-4o-mini"
-
-access:
-  admins: [6150166606]
-  moderators: []
+links:
+  ip: "play.go-play.gg"
+  site: "go-play.gg"
+  discord: "discord.gg/hnwGEFEXzN"
+  telegram: "t.me/mc_goplay"
+  support: "t.me/go_play_support"

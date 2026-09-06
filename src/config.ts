@@ -3,41 +3,42 @@ import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-const LLMProviderConfigSchema = z.object({
-  model: z.string(),
+const ServerSchema = z.object({
+  /** Имя сервера так, как он зарегистрирован в velocity.toml. */
+  id: z.string().min(1),
+  title: z.string().min(1),
+  hint: z.string().default(""),
 });
 
 const ConfigSchema = z.object({
-  servers: z.array(z.string()).min(1),
-  llm: z.object({
-    priority: z.array(z.string()).min(1),
-    max_tokens: z.number().int().positive().default(1024),
-    providers: z.record(z.string(), LLMProviderConfigSchema),
+  servers: z.array(ServerSchema).min(1),
+  /**
+   * Где стоит GoPlayTelegram. Бот не знает, на каком режиме игрок набрал /tg,
+   * поэтому код привязки предъявляется всем сразу. Список отдельный от servers:
+   * лобби игроку в меню не показываем, а команду там набрать можно.
+   */
+  link_servers: z.array(z.string().min(1)).min(1),
+  links: z.object({
+    ip: z.string().min(1),
+    site: z.string().min(1),
+    discord: z.string().min(1),
+    telegram: z.string().min(1),
+    support: z.string().min(1),
   }),
-  access: z
-    .object({
-      admins: z.array(z.number()).default([]),
-      moderators: z.array(z.number()).default([]),
-    })
-    .default({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
+export type ServerConfig = z.infer<typeof ServerSchema>;
 
 const EnvSchema = z.object({
-  TELEGRAM_BOT_TOKEN: z.string().min(1, "TELEGRAM_BOT_TOKEN is required"),
-  GROQ_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
-  BRIDGE_SECRET: z.string().min(1, "BRIDGE_SECRET is required"),
+  TELEGRAM_BOT_TOKEN: z.string().min(1, "TELEGRAM_BOT_TOKEN обязателен"),
+  BRIDGE_SECRET: z.string().min(1, "BRIDGE_SECRET обязателен"),
   BRIDGE_WS_PORT: z.coerce.number().int().positive().default(8765),
+  /** Railway подставляет свой порт сюда и он важнее BRIDGE_WS_PORT. */
   PORT: z.coerce.number().int().positive().optional(),
-  // Привязка игрового аккаунта: бот шлёт код на бэкенд сайта (go-play-be).
-  WEBSITE_API_URL: z.string().url().optional(),
-  WEBSITE_API_TOKEN: z.string().optional(),
-  // Рассылка уведомлений о ивентах: POST /notify на публичный порт бриджа.
+  /** Рассылка анонсов: POST /notify на публичный порт моста. Без секрета выключена. */
   NOTIFY_SECRET: z.string().optional(),
-  // Файл-хранилище подписчиков на уведомления.
-  SUBSCRIBERS_FILE: z.string().default("subscribers.json"),
+  DATABASE_FILE: z.string().default("goplay.db"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -45,8 +46,7 @@ export type Env = z.infer<typeof EnvSchema>;
 export function loadConfig(): Config {
   const configPath = resolve(import.meta.dir, "..", "config.yaml");
   const raw = readFileSync(configPath, "utf-8");
-  const parsed = parseYaml(raw);
-  return ConfigSchema.parse(parsed);
+  return ConfigSchema.parse(parseYaml(raw));
 }
 
 export function loadEnv(): Env {

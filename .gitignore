@@ -3,3 +3,8 @@ node_modules/
 *.log
 *.tsbuildinfo
 dist/
+
+# Локальные данные бота.
+*.db
+*.db-wal
+*.db-shm
