@@ -12,7 +12,7 @@ import type { UiDeps } from "../../ui/types";
  * Код привязки одноразовый и короткий: без лимита его можно перебирать.
  * Пять попыток за десять минут хватает живому человеку с головой.
  */
-const REDEEM_LIMIT = new RateLimiter(5, 10 * 60_000);
+export const REDEEM_LIMIT = new RateLimiter(5, 10 * 60_000);
 
 /**
  * Команды бота. Их намеренно мало: всё остальное живёт в кнопочном меню,
@@ -59,11 +59,10 @@ export function publicCommands(deps: UiDeps): Composer<Context> {
     await sendMenu(ctx, deps, "help");
   });
 
-
   return composer;
 }
 
-async function handleRedeem(
+export async function handleRedeem(
   ctx: Context,
   deps: UiDeps,
   chatId: number,
