@@ -34,9 +34,6 @@ const REQUEST_TIMEOUT_MS = 10_000;
  * смотрит на крутящийся спиннер. Лучше честное "сервер не отвечает".
  */
 const QUERY_TIMEOUT_MS = 8_000;
-/** Верхняя граница текста рассылки — 4096 в Telegram плюс запас на HTML-разметку. */
-const MAX_NOTIFY_LENGTH = 8192;
-
 /** Сравнение секретов за постоянное время. */
 function secretsEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -60,24 +57,12 @@ export class BridgeServer {
   private apiClients = new Set<ServerWebSocket<WsData>>();
   private pending = new Map<string, PendingRequest>();
   private pendingQueries = new Map<string, PendingQuery>();
-  private notifySecret: string | null = null;
-  private notifyHandler: ((text: string) => Promise<unknown>) | null = null;
   private eventHandler: EventHandler | null = null;
 
   constructor(
     private readonly port: number,
     private readonly secret: string,
   ) {}
-
-  /**
-   * Включает HTTP-эндпоинт POST /notify на публичном порту бриджа.
-   * Источник (сайт/cron) шлёт { "text": "..." } с заголовком x-notify-secret.
-   * Бот рассылает текст подписчикам.
-   */
-  onNotify(secret: string, handler: (text: string) => Promise<unknown>): void {
-    this.notifySecret = secret;
-    this.notifyHandler = handler;
-  }
 
   /** Подписка на события, которые плагины шлют сами: рейды, ивенты, рекорды. */
   onEvent(handler: EventHandler): void {
@@ -100,10 +85,6 @@ export class BridgeServer {
         }
 
         const url = new URL(req.url);
-
-        if (req.method === "POST" && url.pathname === "/notify") {
-          return self.handleNotify(req);
-        }
 
         if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
           return Response.json({
@@ -209,36 +190,6 @@ export class BridgeServer {
       this.pendingQueries.set(id, { resolve, timer });
       safeSend(bridge, request);
     });
-  }
-
-  private async handleNotify(req: Request): Promise<Response> {
-    if (!this.notifyHandler || !this.notifySecret) {
-      return new Response("notify disabled", { status: 404 });
-    }
-    if (!secretsEqual(req.headers.get("x-notify-secret") ?? "", this.notifySecret)) {
-      return new Response("forbidden", { status: 403 });
-    }
-
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return new Response("bad json", { status: 400 });
-    }
-
-    const text = (body as { text?: unknown })?.text;
-    if (typeof text !== "string" || !text.trim()) {
-      return new Response("missing text", { status: 400 });
-    }
-    if (text.length > MAX_NOTIFY_LENGTH) {
-      return new Response("text too long", { status: 413 });
-    }
-
-    // Рассылка идёт минутами — отвечаем сразу, чтобы источник не держал соединение.
-    void this.notifyHandler(text).catch((err) => {
-      console.error("[notify] broadcast failed:", err);
-    });
-    return new Response("accepted", { status: 202 });
   }
 
   private handleMessage(ws: ServerWebSocket<WsData>, text: string): void {

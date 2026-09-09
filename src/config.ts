@@ -36,8 +36,6 @@ const EnvSchema = z.object({
   BRIDGE_WS_PORT: z.coerce.number().int().positive().default(8765),
   /** Railway подставляет свой порт сюда и он важнее BRIDGE_WS_PORT. */
   PORT: z.coerce.number().int().positive().optional(),
-  /** Рассылка анонсов: POST /notify на публичный порт моста. Без секрета выключена. */
-  NOTIFY_SECRET: z.string().optional(),
   DATABASE_FILE: z.string().default("goplay.db"),
 });
 

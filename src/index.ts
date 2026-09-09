@@ -13,7 +13,7 @@ import { StatCacheRepo } from "./db/repos/stat-cache";
 import { PushQueue } from "./push/queue";
 import { handleBridgeEvent } from "./bridge/events";
 import { Scheduler } from "./scheduler";
-import { ANNOUNCE_TOPIC, TOPICS } from "./push/topics";
+import { TOPICS } from "./push/topics";
 import { sweep as sweepSessions } from "./ui/session";
 import type { BotUsername, UiDeps } from "./ui/types";
 
@@ -54,15 +54,6 @@ const scheduler = new Scheduler(
   new Map(config.servers.map((s) => [s.id, s.title])),
 );
 scheduler.start();
-
-// Рассылка анонсов. Источник (сайт или расписание) шлёт POST /notify.
-if (env.NOTIFY_SECRET) {
-  bridge.onNotify(env.NOTIFY_SECRET, async (text) => {
-    const queued = push.broadcast(ANNOUNCE_TOPIC, text);
-    console.log(`[notify] анонс поставлен в очередь для ${queued} чатов`);
-  });
-  console.log("[notify] POST /notify включён");
-}
 
 bridge.start();
 
