@@ -44,6 +44,21 @@ describe("renderEvent", () => {
     expect(out?.text).not.toContain("Координаты");
   });
 
+  test("рисует события скупщика, караванов и лаки-блоков", () => {
+    for (const topic of [
+      "seller.event",
+      "seller.convoy",
+      "seller.robbery",
+      "lucky.spawn",
+      "lucky.jackpot",
+    ]) {
+      const out = renderEvent(topic, { text: "&aтекст из игры" });
+      expect(out, topic).not.toBeNull();
+      expect(out?.text).toContain("текст из игры");
+      expect(out?.text).not.toContain("&a");
+    }
+  });
+
   test("незнакомое событие не рисуется", () => {
     expect(renderEvent("что-то новое", {})).toBeNull();
   });
@@ -63,6 +78,21 @@ describe("topicOfEvent", () => {
   test("личные события помечены как личные", () => {
     expect(topicOfEvent("claims.raid")?.scope).toBe("personal");
     expect(topicOfEvent("claims.breach")?.scope).toBe("global");
+  });
+
+  test("караван и его ограбление это один тумблер", () => {
+    expect(topicOfEvent("seller.convoy")?.id).toBe("convoy");
+    expect(topicOfEvent("seller.robbery")?.id).toBe("convoy");
+  });
+
+  test("цены скупщика отделены от караванов", () => {
+    // Цены интересны торговцам, караван это добыча: аудитории разные.
+    expect(topicOfEvent("seller.event")?.id).toBe("seller");
+  });
+
+  test("оба события лаки-блоков ведут в одну тему", () => {
+    expect(topicOfEvent("lucky.spawn")?.id).toBe("lucky");
+    expect(topicOfEvent("lucky.jackpot")?.id).toBe("lucky");
   });
 
   test("неизвестное событие не находит темы", () => {

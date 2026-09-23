@@ -50,6 +50,21 @@ export function renderEvent(topic: string, payload: EventPayload): Rendered | nu
     case "afk.record":
       return { text: `⏱ <b>Новый рекорд паркура</b>\n${clean(str(payload, "text"))}` };
 
+    case "seller.event":
+      return { text: `📈 <b>Скупщик меняет цены</b>\n${clean(str(payload, "text"))}` };
+
+    case "seller.convoy":
+      return { text: `🛒 <b>Караван вышел в путь</b>\n${clean(str(payload, "text"))}` };
+
+    case "seller.robbery":
+      return { text: `💰 <b>Караван ограбили</b>\n${clean(str(payload, "text"))}` };
+
+    case "lucky.spawn":
+      return { text: `👻 <b>Призрачный лаки-блок на арене</b>\n${clean(str(payload, "text"))}` };
+
+    case "lucky.jackpot":
+      return { text: `👑 <b>Джекпот из лаки-блока</b>\n${clean(str(payload, "text"))}` };
+
     case "claims.breach":
       return { text: `💥 <b>База пробита</b>\n${clean(str(payload, "text"))}` };
 
