@@ -35,7 +35,10 @@ const statCache = new StatCacheRepo(db);
 const pushLog = new PushLogRepo(db);
 
 const wsPort = env.PORT ?? env.BRIDGE_WS_PORT;
-const bridge = new BridgeServer(wsPort, env.BRIDGE_SECRET);
+const bridge = new BridgeServer(wsPort, env.BRIDGE_SECRET, env.BRIDGE_API_SECRET);
+if (!env.BRIDGE_API_SECRET) {
+  console.warn("[bridge] BRIDGE_API_SECRET не задан: сайт входит по BRIDGE_SECRET прокси - задайте отдельный");
+}
 
 const botUsername: BotUsername = { value: "" };
 const deps: UiDeps = { botUsername, prefs, links, players, refs, statCache, bridge, config };

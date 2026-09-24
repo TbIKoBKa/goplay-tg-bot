@@ -33,6 +33,12 @@ export type ServerConfig = z.infer<typeof ServerSchema>;
 const EnvSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(1, "TELEGRAM_BOT_TOKEN обязателен"),
   BRIDGE_SECRET: z.string().min(1, "BRIDGE_SECRET обязателен"),
+  /**
+   * Секрет роли "api" (сайт). Без него api входит по BRIDGE_SECRET, как раньше, -
+   * это только на время перехода: общий секрет прокси и сайта открывал консоль всем,
+   * у кого был любой из них.
+   */
+  BRIDGE_API_SECRET: z.string().min(1).optional(),
   BRIDGE_WS_PORT: z.coerce.number().int().positive().default(8765),
   /** Railway подставляет свой порт сюда и он важнее BRIDGE_WS_PORT. */
   PORT: z.coerce.number().int().positive().optional(),

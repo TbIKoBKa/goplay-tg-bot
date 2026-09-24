@@ -34,6 +34,10 @@ const REQUEST_TIMEOUT_MS = 10_000;
  * смотрит на крутящийся спиннер. Лучше честное "сервер не отвечает".
  */
 const QUERY_TIMEOUT_MS = 8_000;
+/** Соединение без авторизации дольше этого закрывается: иначе молчащие сокеты копятся. */
+const AUTH_TIMEOUT_MS = 10_000;
+/** Самый большой кадр - ответ запроса данных; мегабайта хватает с запасом (по умолчанию у Bun 16 МБ). */
+const MAX_PAYLOAD_BYTES = 1024 * 1024;
 /** Сравнение секретов за постоянное время. */
 function secretsEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -59,9 +63,14 @@ export class BridgeServer {
   private pendingQueries = new Map<string, PendingQuery>();
   private eventHandler: EventHandler | null = null;
 
+  /**
+   * @param secret    секрет роли "bridge" (прокси)
+   * @param apiSecret секрет роли "api" (сайт); без него api входит по secret, как раньше
+   */
   constructor(
     private readonly port: number,
     private readonly secret: string,
+    private readonly apiSecret?: string,
   ) {}
 
   /** Подписка на события, которые плагины шлют сами: рейды, ивенты, рекорды. */
@@ -97,8 +106,12 @@ export class BridgeServer {
         return new Response("not found", { status: 404 });
       },
       websocket: {
-        open: () => {
+        maxPayloadLength: MAX_PAYLOAD_BYTES,
+        open: (ws) => {
           console.log("[bridge] client connected, awaiting auth...");
+          setTimeout(() => {
+            if (!ws.data.authenticated) ws.close(1008, "Auth timeout");
+          }, AUTH_TIMEOUT_MS);
         },
         message: (ws, raw) => {
           const text = typeof raw === "string" ? raw : new TextDecoder().decode(raw);
@@ -199,12 +212,10 @@ export class BridgeServer {
       return;
     }
 
-    // Плагин новее бота и умеет кадр, которого мы не знаем. Это штатно:
-    // порядок обновления бота и плагинов не обязан совпадать.
-    if (msg.type === "unknown") return;
-
     if (msg.type === "auth") {
-      if (!secretsEqual(msg.secret, this.secret)) {
+      // У каждой роли свой секрет: секрет прокси не пускает как сайт, и наоборот
+      const expected = msg.role === "api" ? (this.apiSecret ?? this.secret) : this.secret;
+      if (!secretsEqual(msg.secret, expected)) {
         console.warn("[bridge] auth failed, closing");
         ws.close(1008, "Invalid secret");
         return;
@@ -233,6 +244,11 @@ export class BridgeServer {
       ws.close(1008, "Not authenticated");
       return;
     }
+
+    // Плагин новее бота и умеет кадр, которого мы не знаем. Это штатно:
+    // порядок обновления бота и плагинов не обязан совпадать. Проверка - после
+    // авторизации: неизвестный кадр не должен держать открытым чужой сокет.
+    if (msg.type === "unknown") return;
 
     if (msg.type === "response" && ws.data.role === "bridge") {
       const pending = this.pending.get(msg.id);
