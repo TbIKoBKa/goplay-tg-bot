@@ -79,7 +79,7 @@ export class LoginGuard {
     const { links, repo } = this.deps;
 
     if (!check.required && !repo.isEnabled(check.uuid)) {
-      reply({ decision: "allow" });
+      reply({ decision: "allow", reason: "disabled" });
       return;
     }
 
@@ -87,12 +87,12 @@ export class LoginGuard {
     if (!link) {
       // Обычный игрок включил подтверждение, а потом отвязал Telegram: подтверждать некуда,
       // значит, он сам от него отказался. Персоналу без привязки вход закрыт.
-      reply(check.required ? { decision: "deny", reason: "not_linked" } : { decision: "allow" });
+      reply(check.required ? { decision: "deny", reason: "not_linked" } : { decision: "allow", reason: "not_linked" });
       return;
     }
 
     if (repo.isTrusted(check.uuid, check.ip, this.now())) {
-      reply({ decision: "allow" });
+      reply({ decision: "allow", reason: "trusted" });
       return;
     }
 
@@ -148,7 +148,7 @@ export class LoginGuard {
 
     if (ok) {
       this.deps.repo.trust(check.uuid, check.ip, this.now() + TRUST_DAYS * DAY_MS);
-      entry.reply({ decision: "allow" });
+      entry.reply({ decision: "allow", reason: "confirmed" });
       await this.edit(entry, confirmedText(check));
       return "Вход подтверждён";
     }

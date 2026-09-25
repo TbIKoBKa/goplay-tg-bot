@@ -47,7 +47,7 @@ const keyOf = (data: string): string => data.split(":")[3] ?? "";
 describe("LoginGuard", () => {
   test("подтверждение выключено - пускаем сразу", async () => {
     const { guard, sent } = setup();
-    expect(await run(guard, check())).toEqual([{ decision: "allow" }]);
+    expect(await run(guard, check())).toEqual([{ decision: "allow", reason: "disabled" }]);
     expect(sent).toHaveLength(0);
   });
 
@@ -68,11 +68,11 @@ describe("LoginGuard", () => {
 
     const toast = await guard.resolve(CHAT, keyOf(sent[0]?.keys[0] ?? ""), true);
     expect(toast).toBe("Вход подтверждён");
-    expect(replies).toEqual([{ decision: "pending" }, { decision: "allow" }]);
+    expect(replies).toEqual([{ decision: "pending" }, { decision: "allow", reason: "confirmed" }]);
     expect(repo.isTrusted(UUID, "1.2.3.4")).toBe(true);
     expect(edits[0]).toContain("Вход подтверждён");
 
-    expect(await run(guard, check({ id: "req2" }))).toEqual([{ decision: "allow" }]);
+    expect(await run(guard, check({ id: "req2" }))).toEqual([{ decision: "allow", reason: "trusted" }]);
     expect(sent).toHaveLength(1);
   });
 
@@ -121,7 +121,7 @@ describe("LoginGuard", () => {
   test("персонал без привязки - not_linked, обычный игрок без привязки - пускаем", async () => {
     const { guard } = setup({ linked: false, enabled: true });
     expect(await run(guard, check({ required: true }))).toEqual([{ decision: "deny", reason: "not_linked" }]);
-    expect(await run(guard, check())).toEqual([{ decision: "allow" }]);
+    expect(await run(guard, check())).toEqual([{ decision: "allow", reason: "not_linked" }]);
   });
 
   test("персоналу подтверждение нужно даже если сам игрок его не включал", async () => {
