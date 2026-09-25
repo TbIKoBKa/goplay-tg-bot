@@ -50,6 +50,7 @@ export function profileMenu(req: MenuRequest): MenuView {
     keyboard.text("Отмена", cb("profile"));
   } else {
     keyboard.text("📊 Статистика", cb("stats")).row();
+    keyboard.text("🔐 Подтверждение входа", cb("sec")).row();
     keyboard.text("Отвязать аккаунт", cb("profile", "unlink"));
   }
 

@@ -47,7 +47,21 @@ export const BridgeEventSchema = z.object({
   ts: z.number().optional(),
 });
 
+/**
+ * Прокси спрашивает, пускать ли игрока: LimboAuth принял пароль, вход придержан.
+ * Ответ - кадр loginCheckResult с тем же id (см. auth/login-guard).
+ */
+export const BridgeLoginCheckSchema = z.object({
+  type: z.literal("loginCheck"),
+  id: z.string(),
+  uuid: z.string(),
+  nick: z.string(),
+  ip: z.string(),
+  required: z.boolean().default(false),
+});
+
 export type BridgeAuth = z.infer<typeof BridgeAuthSchema>;
+export type BridgeLoginCheck = z.infer<typeof BridgeLoginCheckSchema>;
 export type BridgeRequest = z.infer<typeof BridgeRequestSchema>;
 export type BridgeResponse = z.infer<typeof BridgeResponseSchema>;
 export type BridgeQuery = z.infer<typeof BridgeQuerySchema>;
@@ -69,6 +83,7 @@ export type BridgeMessage =
   | BridgeQuery
   | BridgeQueryResult
   | BridgeEvent
+  | BridgeLoginCheck
   | BridgeUnknown;
 
 export function parseBridgeMessage(raw: string): BridgeMessage | null {
@@ -96,6 +111,8 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
         return BridgeQueryResultSchema.parse(data);
       case "event":
         return BridgeEventSchema.parse(data);
+      case "loginCheck":
+        return BridgeLoginCheckSchema.parse(data);
       default:
         return { type: "unknown", name: type };
     }

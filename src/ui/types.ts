@@ -6,6 +6,7 @@ import type { RefsRepo } from "../db/repos/refs";
 import type { StatCacheRepo } from "../db/repos/stat-cache";
 import type { BridgeServer } from "../bridge/server";
 import type { Config } from "../config";
+import type { LoginGuard } from "../auth/login-guard";
 
 /** Имя бота узнаём у Telegram при старте, поэтому оно приезжает изменяемой ссылкой. */
 export type BotUsername = { value: string };
@@ -19,6 +20,7 @@ export type UiDeps = {
   statCache: StatCacheRepo;
   bridge: BridgeServer;
   config: Config;
+  loginGuard: LoginGuard;
 };
 
 export type MenuRequest = {

@@ -2,6 +2,7 @@ import type { Server, ServerWebSocket } from "bun";
 import {
   parseBridgeMessage,
   type BridgeEvent,
+  type BridgeLoginCheck,
   type BridgeQuery,
   type BridgeRequest,
   type BridgeResponse,
@@ -27,6 +28,12 @@ export type QueryOutcome =
   | { ok: false; error: string };
 
 export type EventHandler = (event: BridgeEvent) => void;
+
+export type LoginCheckReply = { decision: "allow" | "deny" | "pending"; reason?: string };
+export type LoginCheckHandler = (
+  check: BridgeLoginCheck,
+  reply: (r: LoginCheckReply) => void,
+) => void | Promise<void>;
 
 const REQUEST_TIMEOUT_MS = 10_000;
 /**
@@ -62,6 +69,7 @@ export class BridgeServer {
   private pending = new Map<string, PendingRequest>();
   private pendingQueries = new Map<string, PendingQuery>();
   private eventHandler: EventHandler | null = null;
+  private loginCheckHandler: LoginCheckHandler | null = null;
 
   /**
    * @param secret    секрет роли "bridge" (прокси)
@@ -74,6 +82,11 @@ export class BridgeServer {
   ) {}
 
   /** Подписка на события, которые плагины шлют сами: рейды, ивенты, рекорды. */
+  /** Проверка входа: прокси придержал игрока после пароля и ждёт решения. */
+  onLoginCheck(handler: LoginCheckHandler): void {
+    this.loginCheckHandler = handler;
+  }
+
   onEvent(handler: EventHandler): void {
     this.eventHandler = handler;
   }
@@ -271,6 +284,23 @@ export class BridgeServer {
             : { ok: false, error: msg.error || "Сервер вернул ошибку" },
         );
       }
+      return;
+    }
+
+    if (msg.type === "loginCheck" && ws.data.role === "bridge") {
+      // Ответ уходит в то же соединение: если прокси переподключился, он уже сам
+      // отпустил или отклонил ждущие входы, и поздний ответ ему не нужен.
+      const reply = (r: LoginCheckReply): void =>
+        safeSend(ws, { type: "loginCheckResult", id: msg.id, decision: r.decision, reason: r.reason ?? "" });
+      const handler = this.loginCheckHandler;
+      if (!handler) {
+        reply(msg.required ? { decision: "deny", reason: "undeliverable" } : { decision: "allow" });
+        return;
+      }
+      Promise.resolve(handler(msg, reply)).catch((err) => {
+        console.error("[bridge] проверка входа упала:", err);
+        reply(msg.required ? { decision: "deny", reason: "undeliverable" } : { decision: "allow" });
+      });
       return;
     }
 

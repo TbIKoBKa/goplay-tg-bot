@@ -9,6 +9,7 @@ import { leaderboardMenu } from "./menus/leaderboard";
 import { promoMenu } from "./menus/promo";
 import { serverMenu } from "./menus/server";
 import { helpMenu } from "./menus/help";
+import { securityMenu } from "./menus/security";
 import { RateLimiter } from "../bot/rate-limit";
 import type { MenuHandler, MenuRequest, MenuView, UiDeps } from "./types";
 
@@ -22,6 +23,7 @@ const MENUS: Record<string, MenuHandler> = {
   notif: notificationsMenu,
   server: serverMenu,
   help: helpMenu,
+  sec: securityMenu,
 };
 
 /** Защита от залипшего пальца: кнопки жмут быстрее, чем прокси успевает отвечать. */

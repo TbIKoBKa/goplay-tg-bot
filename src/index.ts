@@ -10,6 +10,8 @@ import { SnapshotsRepo } from "./db/repos/snapshots";
 import { PrefsRepo } from "./db/repos/prefs";
 import { PushLogRepo } from "./db/repos/push-log";
 import { StatCacheRepo } from "./db/repos/stat-cache";
+import { LoginGuardRepo } from "./db/repos/login-guard";
+import { LoginGuard } from "./auth/login-guard";
 import { PushQueue } from "./push/queue";
 import { handleBridgeEvent } from "./bridge/events";
 import { Scheduler } from "./scheduler";
@@ -33,6 +35,8 @@ const refs = new RefsRepo(db);
 const snapshots = new SnapshotsRepo(db);
 const statCache = new StatCacheRepo(db);
 const pushLog = new PushLogRepo(db);
+const guardRepo = new LoginGuardRepo(db);
+const loginGuard = new LoginGuard({ links, repo: guardRepo });
 
 const wsPort = env.PORT ?? env.BRIDGE_WS_PORT;
 const bridge = new BridgeServer(wsPort, env.BRIDGE_SECRET, env.BRIDGE_API_SECRET);
@@ -41,8 +45,18 @@ if (!env.BRIDGE_API_SECRET) {
 }
 
 const botUsername: BotUsername = { value: "" };
-const deps: UiDeps = { botUsername, prefs, links, players, refs, statCache, bridge, config };
+const deps: UiDeps = { botUsername, prefs, links, players, refs, statCache, bridge, config, loginGuard };
 const bot = createBot(env.TELEGRAM_BOT_TOKEN, deps);
+
+// Подтверждение входа: сообщение с кнопками уходит через того же бота.
+loginGuard.setSender({
+  ask: async (chatId, text, keyboard) =>
+    (await bot.api.sendMessage(chatId, text, { parse_mode: "HTML", reply_markup: keyboard })).message_id,
+  edit: async (chatId, messageId, text) => {
+    await bot.api.editMessageText(chatId, messageId, text, { parse_mode: "HTML" });
+  },
+});
+bridge.onLoginCheck((check, reply) => loginGuard.handle(check, reply));
 
 const push = new PushQueue(bot, prefs, pushLog);
 push.start();
@@ -63,7 +77,7 @@ bridge.start();
 // Раз в сутки чистим журнал пушей, иначе он растёт вечно.
 const pruneTimer = setInterval(
   () => {
-    const removed = pushLog.prune() + refs.prune();
+    const removed = pushLog.prune() + refs.prune() + guardRepo.prune();
     if (removed > 0) console.log(`[db] выбросил ${removed} старых записей`);
   },
   24 * 60 * 60 * 1000,

@@ -94,6 +94,30 @@ const MIGRATIONS: Migration[] = [
       )
     `);
   },
+
+  // 2. Подтверждение входа через бота.
+  (db) => {
+    // Включил ли игрок подтверждение. Ключ на UUID, как у привязки: настройка
+    // принадлежит игровому аккаунту, а не чату.
+    db.run(`
+      CREATE TABLE login_guard (
+        uuid       TEXT PRIMARY KEY,
+        enabled    INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    // IP, с которых вход уже подтверждён: с них не спрашиваем до until.
+    db.run(`
+      CREATE TABLE trusted_ips (
+        uuid  TEXT NOT NULL,
+        ip    TEXT NOT NULL,
+        until INTEGER NOT NULL,
+        PRIMARY KEY (uuid, ip)
+      )
+    `);
+    db.run("CREATE INDEX idx_trusted_until ON trusted_ips(until)");
+  },
 ];
 
 export function migrate(db: Database): void {
